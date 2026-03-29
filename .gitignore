@@ -1,6 +1,9 @@
-*~
-__pycache__*
+__pycache__/
 *.pyc
-*.egg-info
-*.#~
-logs*
+logs/
+*.pt
+/tmp/
+.venv/
+.vscode/
+.DS_Store
+*.log
