@@ -117,6 +117,23 @@ class JvrcBaseEnv(BaseHumanoidEnv):
             -21,
             22,  # motor vel [2]
         ]
+        # Add arms
+        current_len = len(base_mir_obs)
+        base_mir_obs.extend([
+            -(current_len + 2),   
+            -(current_len + 1),   
+            -(current_len + 4),   
+            -(current_len + 3),   
+        ])
+        
+        base_mir_obs.extend([
+            -(current_len + 6),   
+            -(current_len + 5),   
+            -(current_len + 8),   
+            -(current_len + 7),   
+        ])
+
+
         num_ext_obs = self._get_num_external_obs()
         append_obs = [(len(base_mir_obs) + i) for i in range(num_ext_obs)]
         self.robot.clock_inds = append_obs[0:2]

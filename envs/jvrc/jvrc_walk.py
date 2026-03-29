@@ -43,10 +43,28 @@ class JvrcWalkEnv(JvrcBaseEnv):
         return 6  # clock(2) + mode_encode(3) + mode_ref(1)
 
     def _setup_obs_normalization(self) -> None:
+        num_arm_joints = len(self.actuators) - 12
+        arm_initial_rad = np.deg2rad(getattr(self.cfg, "arm_half_sitting_pose", [0]*num_arm_joints))
         self.obs_mean = np.concatenate(
-            (np.zeros(5), np.deg2rad(self.half_sitting_pose), np.zeros(12), [0.5, 0.5, 0.5, 0, 0, 0])
+            (
+                np.zeros(5),                       
+                np.deg2rad(self.half_sitting_pose),
+                np.zeros(12),                      
+                arm_initial_rad,                   
+                np.zeros(num_arm_joints),          
+                [0.5, 0.5, 0.5, 0, 0, 0]          
+            )
         )
-        self.obs_std = np.concatenate(([0.2, 0.2, 1, 1, 1], 0.5 * np.ones(12), 4 * np.ones(12), [1, 1, 1, 1, 1, 1]))
+        self.obs_std = np.concatenate(
+            (
+                [0.2, 0.2, 1, 1, 1],
+                0.5 * np.ones(12),
+                4 * np.ones(12),
+                0.5 * np.ones(num_arm_joints),    
+                2 * np.ones(num_arm_joints),      
+                [1, 1, 1, 1, 1, 1]               
+            )
+        )
         self.obs_mean = np.tile(self.obs_mean, self.history_len)
         self.obs_std = np.tile(self.obs_std, self.history_len)
 

@@ -42,22 +42,30 @@ class JvrcStepEnv(JvrcBaseEnv):
         return 10  # clock(2) + goal_steps_x(2) + y(2) + z(2) + theta(2)
 
     def _setup_obs_normalization(self) -> None:
+        num_arm_joints = len(self.actuators) - 12   
+
+        arm_initial_rad = np.deg2rad(getattr(self.cfg, "arm_half_sitting_pose", [0]*num_arm_joints))
+
         self.obs_mean = np.concatenate(
             (
-                np.zeros(5),  # root_r, root_p, root_ang_vel
-                np.deg2rad(self.half_sitting_pose),
-                np.zeros(12),  # motor_pos, motor_vel
-                [0.5, 0.5],  # clock
-                np.zeros(8),  # goal step coords (x, y, z, theta for 2 steps)
+            np.zeros(5),                         
+            np.deg2rad(self.half_sitting_pose),  
+            np.zeros(12),                        
+            arm_initial_rad,                     
+            np.zeros(num_arm_joints),            
+            [0.5, 0.5],                          
+            np.zeros(8),                         
             )
         )
         self.obs_std = np.concatenate(
             (
-                [0.2, 0.2, 1, 1, 1],  # root orient and ang vel
-                0.5 * np.ones(12),
-                4 * np.ones(12),  # motor pos and vel
-                [1, 1],  # clock
-                np.ones(8),  # goal step coords
+            [0.2, 0.2, 1, 1, 1],                
+            0.5 * np.ones(12),                 
+            4 * np.ones(12),                    
+            0.5 * np.ones(num_arm_joints),      
+            2 * np.ones(num_arm_joints),        
+            [1, 1],                             
+            np.ones(8),                         
             )
         )
         self.obs_mean = np.tile(self.obs_mean, self.history_len)
