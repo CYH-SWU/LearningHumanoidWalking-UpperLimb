@@ -14,7 +14,7 @@ from envs.common.base_humanoid_env import BaseHumanoidEnv
 from robots.robot_base import RobotBase
 from tasks import observations as obs
 
-from .gen_xml import LEG_JOINTS
+from .gen_xml import LEG_JOINTS, KEEP_ARM_JOINTS
 
 
 class JvrcBaseEnv(BaseHumanoidEnv):
@@ -38,20 +38,34 @@ class JvrcBaseEnv(BaseHumanoidEnv):
     def _setup_robot(self) -> None:
         control_dt = self.cfg.control_dt
 
-        # PD gains from config
-        pdgains = np.zeros((2, 12))
-        pdgains[0] = self.cfg.kp
-        pdgains[1] = self.cfg.kd
+        self.actuators = LEG_JOINTS + KEEP_ARM_JOINTS
+        print("=== actuators order ===")
+        print("Legs (first 12):", self.actuators[:12])
+        print("Arms (last 4):", self.actuators[12:])
 
-        self.actuators = LEG_JOINTS
+        # PD gains from config
+        total_act = len(self.actuators)
+        pdgains = np.zeros((2, total_act))
+        # Legs
+        pdgains[0, :12] = self.cfg.kp
+        pdgains[1, :12] = self.cfg.kd
+        # Arms
+        arm_kp = getattr(self.cfg, "arm_kp", [0.5] * 4)
+        arm_kd = getattr(self.cfg, "arm_kd", [0.05] * 4)
+        pdgains[0, 12:] = arm_kp
+        pdgains[1, 12:] = arm_kd
+        
 
         # Get half-sitting pose from config (in degrees)
         self.half_sitting_pose = self.cfg.half_sitting_pose
+        arm_angles_deg = getattr(self.cfg, "arm_half_sitting_pose", [0, 0, 0, 0])
+        arm_angles_rad = np.deg2rad(arm_angles_deg).tolist()
 
         # Define nominal pose
         base_position = [0, 0, 0.81]
         base_orientation = [1, 0, 0, 0]
-        self.nominal_pose = base_position + base_orientation + np.deg2rad(self.half_sitting_pose).tolist()
+        self.nominal_pose = base_position + base_orientation + np.deg2rad(self.half_sitting_pose).tolist()\
+        + arm_angles_rad
 
         # Setup interface
         self.interface = robot_interface.RobotInterface(self.model, self.data, self.RFOOT_BODY, self.LFOOT_BODY, None)
@@ -107,7 +121,8 @@ class JvrcBaseEnv(BaseHumanoidEnv):
         append_obs = [(len(base_mir_obs) + i) for i in range(num_ext_obs)]
         self.robot.clock_inds = append_obs[0:2]
         self.robot.mirrored_obs = np.array(base_mir_obs + append_obs, copy=True).tolist()
-        self.robot.mirrored_acts = [6, -7, -8, 9, -10, 11, 0.1, -1, -2, 3, -4, 5]
+        self.robot.mirrored_acts = [6, -7, -8, 9, -10, 11, 0.1, -1, -2, 3, -4, 5,
+                                    13, -12, 15, -14]
 
     @abstractmethod
     def _get_num_external_obs(self) -> int:
@@ -119,7 +134,7 @@ class JvrcBaseEnv(BaseHumanoidEnv):
         self.action_space = np.zeros(action_space_size)
         self.prev_prediction = np.zeros(action_space_size)
 
-        self.base_obs_len = 29 + self._get_num_external_obs()  # 29 = robot state
+        self.base_obs_len = len(self._get_robot_state()) + self._get_num_external_obs()  # get state of robot
         self.observation_space = np.zeros(self.base_obs_len * self.history_len)
 
         # Setup observation normalization

@@ -54,6 +54,12 @@ LEG_JOINTS = [
     "L_ANKLE_P",
 ]
 
+KEEP_ARM_JOINTS = [
+    "R_SHOULDER_P", 
+    "L_SHOULDER_P", 
+    "R_ELBOW_P", 
+    "L_ELBOW_P"]
+
 
 def builder(export_path, config):
     print("Modifying XML model...")
@@ -78,27 +84,26 @@ def builder(export_path, config):
 
     # remove actuators except for leg joints
     for mot in mjcf_model.actuator.motor:
-        if mot.joint.name not in LEG_JOINTS:
+        if mot.joint.name not in LEG_JOINTS and mot.joint.name not in KEEP_ARM_JOINTS:
             mot.remove()
 
     # remove unused joints
-    for joint in WAIST_JOINTS + HEAD_JOINTS + HAND_JOINTS + ARM_JOINTS:
+    ALL_JOINT = WAIST_JOINTS + HEAD_JOINTS + HAND_JOINTS + ARM_JOINTS
+    for joint in ALL_JOINT:
+        if joint in KEEP_ARM_JOINTS:
+            continue
         mjcf_model.find("joint", joint).remove()
+
+    # set joint limits for kept arm joints
+    for jnt_name in KEEP_ARM_JOINTS:
+        joint = mjcf_model.find("joint", jnt_name)
+        if "SHOULDER" in jnt_name:
+            joint.range = [-0.8, 0.8]   # ±45°
+        elif "ELBOW" in jnt_name:
+            joint.range = [0, 1.57]      # 0~90
 
     # remove existing equality
     mjcf_model.equality.remove()
-
-    # set arm joints to fixed configuration
-    arm_bodies = {
-        "R_SHOULDER_P_S": [0, -0.052, 0],
-        "R_SHOULDER_R_S": [-0.17, 0, 0],
-        "R_ELBOW_P_S": [0, -0.524, 0],
-        "L_SHOULDER_P_S": [0, -0.052, 0],
-        "L_SHOULDER_R_S": [0.17, 0, 0],
-        "L_ELBOW_P_S": [0, -0.524, 0],
-    }
-    for bname, euler in arm_bodies.items():
-        mjcf_model.find("body", bname).euler = euler
 
     # collision geoms
     collision_geoms = [
@@ -121,17 +126,85 @@ def builder(export_path, config):
     # move collision geoms to different group
     mjcf_model.default.default["collision"].geom.group = 3
 
-    # manually create collision geom for feet
+    # manually create collision geom for feet and arms
     mjcf_model.worldbody.find("body", "R_ANKLE_P_S").add(
-        "geom", dclass="collision", size="0.1 0.05 0.01", pos="0.029 0 -0.09778", type="box"
+        "geom", dclass="collision", size="0.1 0.05 0.01", pos="0.029 0 -0.09778", type="box",
+        rgba=[1, 0, 0, 0.5]
     )
     mjcf_model.worldbody.find("body", "L_ANKLE_P_S").add(
-        "geom", dclass="collision", size="0.1 0.05 0.01", pos="0.029 0 -0.09778", type="box"
+        "geom", dclass="collision", size="0.1 0.05 0.01", pos="0.029 0 -0.09778", type="box",
+        rgba=[1, 0, 0, 0.5]
     )
+
+    mjcf_model.worldbody.find("body", "R_SHOULDER_P_S").add(
+        "geom",
+        name="R_upper_arm_collision",
+        type="capsule",
+        size=[0.05, 0.15],           
+        pos=[0, 0, -0.15],           
+        euler=[0, 0, 0],             
+        dclass="collision",
+        group=0,
+        rgba=[1, 0, 0, 0.5]
+    )
+    
+    mjcf_model.worldbody.find("body", "L_SHOULDER_P_S").add(
+        "geom",
+        name="L_upper_arm_collision",
+        type="capsule",
+        size=[0.05, 0.15],
+        pos=[0, 0, -0.15],
+        euler=[0, 0, 0],
+        dclass="collision",
+        group=0,
+        rgba=[1, 0, 0, 0.5]
+    )
+
+    mjcf_model.worldbody.find("body", "R_ELBOW_P_S").add(
+        "geom",
+        name="R_forearm_collision",
+        type="capsule",
+        size=[0.04, 0.12],
+        pos=[0, 0, -0.12],
+        euler=[0, 0, 0],
+        dclass="collision",
+        group=0,
+        rgba=[1, 0, 0, 0.5]
+    )
+
+    mjcf_model.worldbody.find("body", "L_ELBOW_P_S").add(
+        "geom",
+        name="L_forearm_collision",
+        type="capsule",
+        size=[0.04, 0.12],
+        pos=[0, 0, -0.12],
+        euler=[0, 0, 0],
+        dclass="collision",
+        group=0,
+        rgba=[1, 0, 0, 0.5]
+    )
+
+    try:
+        mjcf_model.worldbody.find("body", "R_WRIST_Y_S").add(
+            "geom", name="R_hand_collision", type="sphere", size=[0.04], pos=[0, 0, 0], dclass="collision", group=0,
+            rgba=[1, 0, 0, 0.5]
+        )
+        mjcf_model.worldbody.find("body", "L_WRIST_Y_S").add(
+            "geom", name="L_hand_collision", type="sphere", size=[0.04], pos=[0, 0, 0], dclass="collision", group=0,
+            rgba=[1, 0, 0, 0.5]
+        )
+    except Exception:
+        print("Warning: Could not add hand collision (wrist body missing)")
 
     # ignore collision
     mjcf_model.contact.add("exclude", body1="R_KNEE_S", body2="R_ANKLE_P_S")
     mjcf_model.contact.add("exclude", body1="L_KNEE_S", body2="L_ANKLE_P_S")
+
+    mjcf_model.contact.add("exclude", body1="R_SHOULDER_P_S", body2="PELVIS_S")
+    mjcf_model.contact.add("exclude", body1="L_SHOULDER_P_S", body2="PELVIS_S")
+
+    mjcf_model.contact.add("exclude", body1="R_ELBOW_P_S", body2="R_THIGH_S")
+    mjcf_model.contact.add("exclude", body1="L_ELBOW_P_S", body2="L_THIGH_S")
 
     # remove unused meshes
     meshes = [g.mesh.name for g in mjcf_model.find_all("geom") if g.type == "mesh" or g.type is None]

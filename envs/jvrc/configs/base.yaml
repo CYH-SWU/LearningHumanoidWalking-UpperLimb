@@ -16,6 +16,8 @@ kd: [20, 20, 20, 25, 8, 8,
 half_sitting_pose: [-30, 0, 0, 50, 0, -24,
                     -30, 0, 0, 50, 0, -24]
 
+arm_half_sitting_pose: [0.0, -10.0, 0.0, -10.0]
+
 # Task parameters
 task:
   goal_height: 0.80
