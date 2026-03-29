@@ -88,58 +88,37 @@ class JvrcBaseEnv(BaseHumanoidEnv):
         """Setup mirror indices for symmetry-based learning."""
         base_mir_obs = [
             -0.1,
-            1,  # root orient
-            -2,
-            3,
-            -4,  # root ang vel
-            11,
-            -12,
-            -13,
-            14,
-            -15,
-            16,  # motor pos [1]
-            5,
-            -6,
-            -7,
-            8,
-            -9,
-            10,  # motor pos [2]
-            23,
-            -24,
-            -25,
-            26,
-            -27,
-            28,  # motor vel [1]
-            17,
-            -18,
-            -19,
-            20,
-            -21,
-            22,  # motor vel [2]
+            1, -2, 3, -4,
+            11, -12, -13, 14, -15, 16,
+            5, -6, -7, 8, -9, 10,
+            23, -24, -25, 26, -27, 28,
+            17, -18, -19, 20, -21, 22
         ]
-        # Add arms
         current_len = len(base_mir_obs)
+
         base_mir_obs.extend([
-            -(current_len + 2),   
-            -(current_len + 1),   
-            -(current_len + 4),   
-            -(current_len + 3),   
-        ])
-        
-        base_mir_obs.extend([
-            -(current_len + 6),   
-            -(current_len + 5),   
-            -(current_len + 8),   
-            -(current_len + 7),   
+            -(current_len + 2),
+            -(current_len + 3),
+            -(current_len + 0),
+            -(current_len + 1),
         ])
 
+        base_mir_obs.extend([
+            -(current_len + 6),
+            -(current_len + 7),
+            -(current_len + 4),
+            -(current_len + 5),
+        ])
 
         num_ext_obs = self._get_num_external_obs()
         append_obs = [(len(base_mir_obs) + i) for i in range(num_ext_obs)]
         self.robot.clock_inds = append_obs[0:2]
         self.robot.mirrored_obs = np.array(base_mir_obs + append_obs, copy=True).tolist()
-        self.robot.mirrored_acts = [6, -7, -8, 9, -10, 11, 0.1, -1, -2, 3, -4, 5,
-                                    13, -12, 15, -14]
+
+        self.robot.mirrored_acts = [
+            5, -6, -7, 8, -9, 10, 0.1, -0, -1, 2, -3, 4,
+            -14, -15, -12, -13
+        ]
 
     @abstractmethod
     def _get_num_external_obs(self) -> int:

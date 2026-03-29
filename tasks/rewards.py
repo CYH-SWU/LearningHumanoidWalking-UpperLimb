@@ -295,3 +295,59 @@ def create_phase_reward(swing_duration, stance_duration, strict_relaxer, stance_
     l_vel_phase_spline = PchipInterpolator(l_vel_phase_points_repeated[0], l_vel_phase_points_repeated[1])
 
     return [r_frc_phase_spline, r_vel_phase_spline], [l_frc_phase_spline, l_vel_phase_spline]
+
+# arms
+
+def calc_arm_swing_reward(arm_vel: np.ndarray) -> float:
+    """Encourage arm movement to avoid static arms.
+
+    Args:
+        arm_vel: Arm joint velocities (rad/s), expected shape (4,): [right_shoulder, left_shoulder, right_elbow, left_elbow].
+
+    Returns:
+        Reward value in [0,1], higher for moderate speed (~0.5 rad/s).
+    """
+    mean_speed = np.mean(np.abs(arm_vel))
+    return np.exp(-5 * (mean_speed - 0.5)**2)
+
+
+def calc_arm_phase_reward(
+    arm_pos: np.ndarray,
+    phase: float,
+    period: float,
+    amplitude: float = 0.3,
+) -> float:
+    """Reward for arm swing synchronized with gait phase (right leg forward -> left arm forward).
+
+    Args:
+        arm_pos: Arm joint angles (rad), order: [right_shoulder, left_shoulder, right_elbow, left_elbow].
+        phase: Current gait phase (0..period).
+        period: Gait period.
+        amplitude: Desired swing amplitude (rad).
+
+    Returns:
+        Exponential reward based on squared error from desired angles.
+    """
+    theta = 2 * np.pi * phase / period
+    # Desired: left shoulder swings with sin(theta), right shoulder opposite.
+    desired_left_shoulder = -amplitude * np.sin(theta)
+    desired_right_shoulder = amplitude * np.sin(theta)
+    desired_left_elbow = 0.5 * desired_left_shoulder
+    desired_right_elbow = 0.5 * desired_right_shoulder
+    desired = np.array([desired_right_shoulder, desired_left_shoulder,
+                        desired_right_elbow, desired_left_elbow])
+    error = np.mean((arm_pos - desired) ** 2)
+    return np.exp(-10 * error)
+
+
+def calc_arm_torque_penalty(arm_torque: np.ndarray) -> float:
+    """Penalize large arm torques to avoid wasteful flailing.
+
+    Args:
+        arm_torque: Arm joint torques.
+
+    Returns:
+        Negative reward (penalty) in [-1, 0].
+    """
+    penalty = 0.001 * np.sum(arm_torque ** 2)
+    return -min(penalty, 1.0)

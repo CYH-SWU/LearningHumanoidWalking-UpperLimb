@@ -55,10 +55,11 @@ LEG_JOINTS = [
 ]
 
 KEEP_ARM_JOINTS = [
-    "R_SHOULDER_P", 
-    "L_SHOULDER_P", 
-    "R_ELBOW_P", 
-    "L_ELBOW_P"]
+    "R_SHOULDER_P",
+    "R_ELBOW_P",
+    "L_SHOULDER_P",
+    "L_ELBOW_P"
+]
 
 
 def builder(export_path, config):
@@ -107,7 +108,7 @@ def builder(export_path, config):
         if "SHOULDER" in jnt_name:
             joint.range = [-0.8, 0.8]   # ±45°
         elif "ELBOW" in jnt_name:
-            joint.range = [0, 1.57]      # 0~90
+            joint.range = [-1.57, 0]    # 0~90
 
 
     # remove existing equality

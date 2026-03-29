@@ -6,6 +6,7 @@ import transforms3d as tf3
 
 from tasks import rewards
 from tasks.base_task import BaseTask
+from tasks.rewards import calc_arm_swing_reward, calc_arm_phase_reward, calc_arm_torque_penalty
 
 
 class WalkModes(Enum):
@@ -120,6 +121,24 @@ class SteppingTask(BaseTask):
             step_reward=0.450 * self.step_reward(),
             upper_body_reward=0.050 * np.exp(-10 * np.square(np.linalg.norm(head_pos - root_pos))),
         )
+        # Get arm joint states (assume last 4 joints: R_shoulder, L_shoulder, R_elbow, L_elbow)
+        arm_pos = self._client.get_act_joint_positions()[-4:]
+        arm_vel = self._client.get_act_joint_velocities()[-4:]
+        arm_torque = self._client.get_act_joint_torques()[-4:]
+
+        # 1. Encourage arm movement (avoid static arms)
+        arm_motion_reward = calc_arm_swing_reward(arm_vel)
+        # 2. Phase matching reward (synchronize with gait)
+        arm_phase_reward = calc_arm_phase_reward(
+            arm_pos, self._phase, self._period, amplitude=0.3
+        )
+        # 3. Penalize large torques (avoid wasteful flailing)
+        arm_energy_penalty = calc_arm_torque_penalty(arm_torque)
+
+        # Merge into reward dict (weights can be tuned)
+        reward["arm_motion"] = 0.02 * arm_motion_reward
+        reward["arm_phase"] = 0.05 * arm_phase_reward
+        reward["arm_energy"] = arm_energy_penalty   # already negative
         return reward
 
     def transform_sequence(self, sequence):
