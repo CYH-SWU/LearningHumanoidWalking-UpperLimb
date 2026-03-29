@@ -11,8 +11,6 @@ import mujoco
 
 def main():
     env = JvrcWalkEnv()
-    # 在 env = JvrcStepEnv() 之后添加
-    print("\n实际执行器顺序（关节名称）:")
     joint_names = env.interface.get_actuated_joint_names()
     for i, name in enumerate(joint_names):
         print(f"  actuator {i}: {name}")
