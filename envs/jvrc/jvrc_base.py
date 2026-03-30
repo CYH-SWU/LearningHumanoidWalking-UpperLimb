@@ -95,7 +95,7 @@ class JvrcBaseEnv(BaseHumanoidEnv):
             17, -18, -19, 20, -21, 22
         ]
         current_len = len(base_mir_obs)
-
+        # Extend arms
         base_mir_obs.extend([
             -(current_len + 2),
             -(current_len + 3),

@@ -296,7 +296,7 @@ def create_phase_reward(swing_duration, stance_duration, strict_relaxer, stance_
 
     return [r_frc_phase_spline, r_vel_phase_spline], [l_frc_phase_spline, l_vel_phase_spline]
 
-# arms
+# Arms
 
 def calc_arm_swing_reward(arm_vel: np.ndarray) -> float:
     """Encourage arm movement to avoid static arms.
@@ -349,5 +349,5 @@ def calc_arm_torque_penalty(arm_torque: np.ndarray) -> float:
     Returns:
         Negative reward (penalty) in [-1, 0].
     """
-    penalty = 0.001 * np.sum(arm_torque ** 2)
+    penalty = 0.0001 * np.sum(arm_torque ** 2)
     return -min(penalty, 1.0)

@@ -53,7 +53,7 @@ LEG_JOINTS = [
     "L_ANKLE_R",
     "L_ANKLE_P",
 ]
-
+# Keep arm joints
 KEEP_ARM_JOINTS = [
     "R_SHOULDER_P",
     "R_ELBOW_P",

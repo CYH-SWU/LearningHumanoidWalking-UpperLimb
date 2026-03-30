@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 '''Observe the initial state of the robot
 
 Usage:
@@ -11,14 +12,10 @@ import mujoco
 
 def main():
     env = JvrcWalkEnv()
-    joint_names = env.interface.get_actuated_joint_names()
-    for i, name in enumerate(joint_names):
-        print(f"  actuator {i}: {name}")
     env.reset()
     env.render()
 
     while env.viewer.is_running():
-        env.step(np.zeros(env.action_space.shape[0]))
         env.render()
         time.sleep(0.01)
 
