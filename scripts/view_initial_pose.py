@@ -4,7 +4,7 @@
 Usage:
     python scripts/view_initial_pose.py
 '''
-
+#
 import numpy as np
 from envs.jvrc.jvrc_walk import JvrcWalkEnv
 import time
@@ -16,6 +16,7 @@ def main():
     env.render()
 
     while env.viewer.is_running():
+        env.step(np.zeros(env.action_space.shape[0]))
         env.render()
         time.sleep(0.01)
 
