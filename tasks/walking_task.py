@@ -4,6 +4,7 @@ import numpy as np
 
 from tasks import rewards
 from tasks.base_task import BaseTask
+from tasks.rewards import calc_arm_swing_reward, calc_arm_phase_reward, calc_arm_torque_penalty
 
 
 class WalkModes(Enum):
@@ -25,7 +26,7 @@ class WalkModes(Enum):
         if self.name == "INPLACE":
             return np.random.uniform(-0.5, 0.5)
         if self.name == "FORWARD":
-            return np.random.uniform(0.0, 0.4)
+            return np.random.uniform(0.7, 1.5)
 
 
 class WalkingTask(BaseTask):
@@ -120,21 +121,44 @@ class WalkingTask(BaseTask):
             self._goal_speed_ref = self.mode_ref
             yaw_vel_ref = 0
 
+        # Get arm joint states (last 4 joints: R_shoulder, L_shoulder, R_elbow, L_elbow)
+        arm_pos = self._client.get_act_joint_positions()[-4:]
+        arm_vel = self._client.get_act_joint_velocities()[-4:]
+        arm_torque = self._client.get_act_joint_torques()[-4:]
+
+        # Upper‑limb reward components
+        arm_motion_reward = calc_arm_swing_reward(arm_vel)
+        arm_phase_reward = calc_arm_phase_reward(
+            arm_pos, self._phase, self._period, amplitude=0.3
+        )
+        arm_energy_penalty = calc_arm_torque_penalty(arm_torque)
+
         # Calculate rewards with explicit parameters
         reward = dict(
             foot_frc_score=0.225
             * rewards.calc_foot_frc_clock_reward(l_foot_frc, r_foot_frc, self._phase, l_frc_fn, r_frc_fn, self._mass),
             foot_vel_score=0.225
             * rewards.calc_foot_vel_clock_reward(l_foot_vel, r_foot_vel, self._phase, l_vel_fn, r_vel_fn),
-            root_accel=0.050 * rewards.calc_root_accel_reward(qvel, qacc),
+            root_accel=0.050 
+            * rewards.calc_root_accel_reward(qvel, qacc),
             height_error=0.050
             * rewards.calc_height_reward(root_height, self._goal_height_ref, self._goal_speed_ref, contact_point_z),
-            com_vel_error=0.150 * rewards.calc_fwd_vel_reward(root_vel, self._goal_speed_ref),
-            yaw_vel_error=0.150 * rewards.calc_yaw_vel_reward(yaw_vel, yaw_vel_ref),
-            upper_body_reward=0.050 * np.exp(-10 * np.linalg.norm(head_pos - root_pos)),
-            posture_error=0.050 * np.exp(-np.linalg.norm(self._neutral_pose[:12] - current_pose[:12])),
-            torque_penalty=0.025 * rewards.calc_torque_reward(current_torque, prev_torque),
-            action_penalty=0.025 * rewards.calc_action_reward(action, prev_action),
+            com_vel_error=0.600 
+            * rewards.calc_fwd_vel_reward(root_vel, self._goal_speed_ref),
+            yaw_vel_error=0.150
+            * rewards.calc_yaw_vel_reward(yaw_vel, yaw_vel_ref),
+            upper_body_reward=0.050
+            * np.exp(-10 * np.linalg.norm(head_pos - root_pos)),
+            posture_error=0.050 
+            * np.exp(-np.linalg.norm(self._neutral_pose[:12] - current_pose[:12])),
+            torque_penalty=0.025 
+            * rewards.calc_torque_reward(current_torque, prev_torque),
+            action_penalty=0.025 
+            * rewards.calc_action_reward(action, prev_action),
+            # Upper‑limb components
+            arm_motion=0.02 * arm_motion_reward,
+            arm_phase= 0.05* arm_phase_reward,
+            arm_energy=arm_energy_penalty,   # already negative
         )
         return reward
 
@@ -188,8 +212,10 @@ class WalkingTask(BaseTask):
 
     def reset(self, iter_count=0):
         # select a walking 'mode'
-        self.mode = np.random.choice([WalkModes.STANDING, WalkModes.INPLACE, WalkModes.FORWARD], p=[0.6, 0.2, 0.2])
+        # p=[0.6, 0.2, 0.2] [0.2, 0.2, 0.6] [0.0, 0.0, 1.0]
+        self.mode = np.random.choice([WalkModes.STANDING, WalkModes.INPLACE, WalkModes.FORWARD], p=[0.2, 0.2, 0.6])
         self.mode_ref = self.mode.sample_ref()
+        #self.mode_ref = 1.5
 
         self.right_clock, self.left_clock = rewards.create_phase_reward(
             self._swing_duration, self._stance_duration, 0.1, "grounded", 1 / self._control_dt

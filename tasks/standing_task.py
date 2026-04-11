@@ -20,7 +20,7 @@ class StandingTask(BaseTask):
         neutral_pose: Target joint positions for standing.
     """
 
-    def __init__(self, client, neutral_pose):
+    def __init__(self, client, neutral_pose, arm_neutral_pose=None):
         """Initialize the standing task.
 
         Args:
@@ -29,6 +29,7 @@ class StandingTask(BaseTask):
         """
         self._client = client
         self.neutral_pose = neutral_pose
+        self.arm_neutral_pose = np.array(arm_neutral_pose) if arm_neutral_pose is not None else np.zeros(4)
 
     def reset(self, iter_count: int = 0) -> None:
         """Reset task state for a new episode.
@@ -52,24 +53,6 @@ class StandingTask(BaseTask):
         prev_action: np.ndarray,
         action: np.ndarray,
     ) -> dict[str, float]:
-        """Calculate reward components for standing.
-
-        Rewards the robot for:
-        - Maintaining target height
-        - Keeping upper body aligned over pelvis
-        - Maintaining neutral posture
-        - Minimizing joint torques
-        - Minimizing forward velocity (staying in place)
-        - Minimizing yaw velocity (not spinning)
-
-        Args:
-            prev_torque: Joint torques from the previous step (unused).
-            prev_action: Action from the previous step (unused).
-            action: Current action (unused).
-
-        Returns:
-            Dictionary of reward components.
-        """
         root_pose = self._client.get_object_affine_by_name("pelvis", "OBJ_BODY")
 
         # height reward
@@ -96,6 +79,23 @@ class StandingTask(BaseTask):
         yaw_vel = self._client.get_qvel()[5]
         yaw_vel_error = np.linalg.norm(yaw_vel)
 
+        # Upper‑limb states (last 4 joints: R_shoulder, L_shoulder, R_elbow, L_elbow)
+        arm_pos = self._client.get_act_joint_positions()[-4:]
+        arm_vel = self._client.get_act_joint_velocities()[-4:]
+        arm_torque = self._client.get_act_joint_torques()[-4:]
+
+        # Upper‑limb reward: target micro‑bent pose (from config)
+        arm_neutral = self.arm_neutral_pose
+        arm_posture_error = np.linalg.norm(arm_pos - arm_neutral)
+        arm_posture_reward = 0.05 * np.exp(-20 * arm_posture_error)
+
+        # Penalize large torques
+        arm_torque_penalty = -0.0005 * np.sum(np.square(arm_torque))
+
+        # Slight bonus for natural motion (peak at 0.1 rad/s)
+        arm_speed = np.mean(np.abs(arm_vel))
+        arm_motion_bonus = 0.01 * np.exp(-5 * (arm_speed - 0.1)**2)
+
         reward = {
             "com_vel_error": 0.3 * np.exp(-4 * np.square(fwd_vel_error)),
             "yaw_vel_error": 0.3 * np.exp(-4 * np.square(yaw_vel_error)),
@@ -103,6 +103,10 @@ class StandingTask(BaseTask):
             "upperbody": 0.1 * np.exp(-40 * np.square(upperbody_error)),
             "joint_torque_reward": 0.1 * np.exp(-5e-5 * np.square(tau_error)),
             "posture": 0.1 * np.exp(-1 * np.square(posture_error)),
+            # Upper‑limb components
+            "arm_posture": arm_posture_reward,
+            "arm_torque_penalty": arm_torque_penalty,
+            "arm_motion_bonus": arm_motion_bonus,
         }
         return reward
 

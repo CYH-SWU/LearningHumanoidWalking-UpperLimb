@@ -91,7 +91,7 @@ def builder(export_path, config):
     # Set actuator force/torque limits (ctrlrange)
     for mot in mjcf_model.actuator.motor:
         if mot.joint.name in LEG_JOINTS:
-            mot.ctrlrange = [-500, 500]   
+            mot.ctrlrange = [-800, 800]   
         elif mot.joint.name in KEEP_ARM_JOINTS:
             mot.ctrlrange = [-200, 200]   
 

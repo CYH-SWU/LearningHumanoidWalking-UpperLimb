@@ -4,7 +4,7 @@
 Usage:
     python scripts/view_initial_pose.py
 '''
-#
+
 import numpy as np
 from envs.jvrc.jvrc_walk import JvrcWalkEnv
 import time
