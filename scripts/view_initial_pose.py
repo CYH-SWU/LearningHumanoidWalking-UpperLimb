@@ -13,6 +13,7 @@ import mujoco
 def main():
     env = JvrcWalkEnv()
     env.reset()
+    env.model.opt.gravity[2] = 0.0
     env.render()
 
     while env.viewer.is_running():

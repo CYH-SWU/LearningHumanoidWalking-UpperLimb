@@ -26,7 +26,7 @@ class WalkModes(Enum):
         if self.name == "INPLACE":
             return np.random.uniform(-0.5, 0.5)
         if self.name == "FORWARD":
-            return np.random.uniform(0.7, 1.5)
+            return np.random.uniform(0.4, 0.6)
 
 
 class WalkingTask(BaseTask):
@@ -212,10 +212,8 @@ class WalkingTask(BaseTask):
 
     def reset(self, iter_count=0):
         # select a walking 'mode'
-        # p=[0.6, 0.2, 0.2] [0.2, 0.2, 0.6] [0.0, 0.0, 1.0]
-        self.mode = np.random.choice([WalkModes.STANDING, WalkModes.INPLACE, WalkModes.FORWARD], p=[0.2, 0.2, 0.6])
+        self.mode = np.random.choice([WalkModes.STANDING, WalkModes.INPLACE, WalkModes.FORWARD], p=[0.6, 0.2, 0.2])
         self.mode_ref = self.mode.sample_ref()
-        #self.mode_ref = 1.5
 
         self.right_clock, self.left_clock = rewards.create_phase_reward(
             self._swing_duration, self._stance_duration, 0.1, "grounded", 1 / self._control_dt
