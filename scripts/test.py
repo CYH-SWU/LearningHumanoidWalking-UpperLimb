@@ -12,6 +12,7 @@ from envs.jvrc.jvrc_walk import JvrcWalkEnv
 def main():
     env = JvrcWalkEnv()
     env.reset()
+    env.model.opt.gravity[2] = 0.0
     env.render()
 
     # Control period from config

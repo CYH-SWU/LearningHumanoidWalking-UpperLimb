@@ -39,7 +39,7 @@ class JvrcStepEnv(JvrcBaseEnv):
         self.task._stance_duration = task_cfg.stance_duration
 
     def _get_num_external_obs(self) -> int:
-        return 10  # clock(2) + goal_steps_x(2) + y(2) + z(2) + theta(2)
+        return 11  # clock(2) + goal_steps_x(2) + y(2) + z(2) + theta(2) + v(1)
 
     def _setup_obs_normalization(self) -> None:
         num_arm_joints = len(self.actuators) - 12   
@@ -54,7 +54,8 @@ class JvrcStepEnv(JvrcBaseEnv):
             arm_initial_rad,                     
             np.zeros(num_arm_joints),            
             [0.5, 0.5],                          
-            np.zeros(8),                         
+            np.zeros(8),
+            [0.65], # v_mean                        
             )
         )
         self.obs_std = np.concatenate(
@@ -65,7 +66,8 @@ class JvrcStepEnv(JvrcBaseEnv):
             0.5 * np.ones(num_arm_joints),      
             2 * np.ones(num_arm_joints),        
             [1, 1],                             
-            np.ones(8),                         
+            np.ones(8),
+            [0.1], # v_std                        
             )
         )
         self.obs_mean = np.tile(self.obs_mean, self.history_len)
@@ -80,6 +82,7 @@ class JvrcStepEnv(JvrcBaseEnv):
                 np.asarray(self.task._goal_steps_y).flatten(),
                 np.asarray(self.task._goal_steps_z).flatten(),
                 np.asarray(self.task._goal_steps_theta).flatten(),
+                [self.task._goal_speed_ref], # goal_v
             )
         )
 

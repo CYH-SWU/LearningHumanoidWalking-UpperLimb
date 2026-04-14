@@ -39,7 +39,7 @@ class SteppingTask(BaseTask):
 
         self._mass = self._client.get_robot_mass()
 
-        self._goal_speed_ref = 0
+        self._goal_speed_ref = 0.65 # 0
         self._goal_height_ref = []
         self._swing_duration = []
         self._stance_duration = []
@@ -135,10 +135,19 @@ class SteppingTask(BaseTask):
         # 3. Penalize large torques (avoid wasteful flailing)
         arm_energy_penalty = calc_arm_torque_penalty(arm_torque)
 
+        # v_reward
+        root_vel = self._client.get_body_vel(self._root_body_name, frame=1)[0][0]
+        if self.mode != WalkModes.STANDING and self.mode != WalkModes.BACKWARD and self.mode != WalkModes.INPLACE:
+            error = np.abs(root_vel - self._goal_speed_ref)
+            vel_reward = np.exp(-3 * error**2)   
+        else:
+            vel_reward = 0.0
+
         # Merge into reward dict (weights can be tuned)
         reward["arm_motion"] = 0.02 * arm_motion_reward
         reward["arm_phase"] = 0.05 * arm_phase_reward
         reward["arm_energy"] = arm_energy_penalty   # already negative
+        reward['vel_reward'] = 0.25 * vel_reward
         return reward
 
     def transform_sequence(self, sequence):
@@ -272,7 +281,7 @@ class SteppingTask(BaseTask):
         foot_pos = min([c[2] for c in (self.l_foot_pos, self.r_foot_pos)])
         root_rel_height = qpos[2] - foot_pos
         terminate_conditions = {
-            "qpos[2]_ll": (root_rel_height < 0.6),
+            "qpos[2]_ll": (root_rel_height < 0.55), # 0.6
             "contact_flag": contact_flag,
         }
 
@@ -310,26 +319,32 @@ class SteppingTask(BaseTask):
         # select a walking 'mode'
         self.mode = np.random.choice(
             [WalkModes.CURVED, WalkModes.STANDING, WalkModes.BACKWARD, WalkModes.LATERAL, WalkModes.FORWARD],
-            p=[0.15, 0.05, 0.2, 0.3, 0.3],
+            p=[0.10, 0.05, 0.10, 0.25, 0.5], 
         )
-
-        d = {"step_size": 0.3, "step_gap": 0.15, "step_height": 0, "num_steps": 20, "curved": False, "lateral": False}
+        # [0.15, 0.05, 0.2, 0.3, 0.3] [0.10, 0.05, 0.10, 0.25, 0.5] [0, 0, 0, 0, 1]
+        d = {"step_size": 0.325, "step_gap": 0.15, "step_height": 0, "num_steps": 20, "curved": False, "lateral": False}
         # generate sequence according to mode
         if self.mode == WalkModes.CURVED:
             d["curved"] = True
+            self._goal_speed_ref = 0.65
         elif self.mode == WalkModes.STANDING:
             d["num_steps"] = 1
+            self._goal_speed_ref = 0
         elif self.mode == WalkModes.BACKWARD:
             d["step_size"] = -0.1
+            self._goal_speed_ref = 0
         elif self.mode == WalkModes.INPLACE:
             ss = np.random.uniform(-0.05, 0.05)
             d["step_size"] = ss
+            self._goal_speed_ref = 0
         elif self.mode == WalkModes.LATERAL:
             d["step_size"] = 0.4
             d["lateral"] = True
+            self._goal_speed_ref = 0.65
         elif self.mode == WalkModes.FORWARD:
-            h = np.clip((self.iteration_count - 3000) / 8000, 0, 1) * 0.1
+            h = np.clip((self.iteration_count - 4000) / 9000, 0, 1) * 0.1
             d["step_height"] = np.random.choice([-h, h])
+            self._goal_speed_ref = 0.65
         else:
             raise Exception("Invalid WalkModes")
         sequence = self.generate_step_sequence(**d)
@@ -345,7 +360,7 @@ class SteppingTask(BaseTask):
             box_h = self._client.model.geom(box).size[2]
             self._client.model.body(box).pos[:] = step[0:3] - np.array([0, 0, box_h])
             self._client.model.body(box).quat[:] = tf3.euler.euler2quat(0, 0, step[3])
-            self._client.model.geom(box).size[:] = np.array([0.15, 1, box_h])
+            self._client.model.geom(box).size[:] = np.array([0.1625, 1, box_h])
             self._client.model.geom(box).rgba[:] = np.array([0.8, 0.8, 0.8, 1])
 
         self._client.model.body("floor").pos[:] = np.array([0, 0, 0])
